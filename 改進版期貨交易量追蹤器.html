@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>期貨交易量每小時記錄表</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+    }
+    .instructions {
+      background-color: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 5px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .volume-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    .volume-table th, .volume-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    .volume-table th {
+      background-color: #f2f2f2;
+      font-weight: bold;
+    }
+    .volume-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    .volume-table tr:hover {
+      background-color: #f5f5f5;
+    }
+    .date-input {
+      margin-bottom: 10px;
+    }
+    .button-group {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>期貨交易量每小時記錄表</h1>
+  
+  <div class="instructions">
+    <h3>使用說明：</h3>
+    <ol>
+      <li>選擇日期並輸入數據。</li>
+      <li>數據會自動保存到瀏覽器的本地存儲。</li>
+      <li>使用"導出到Excel"按鈕將數據保存為Excel文件。</li>
+      <li>使用"導入Excel"按鈕從之前保存的Excel文件中載入數據。</li>
+    </ol>
+  </div>
+
+  <div class="date-input">
+    <label for="trade-date">交易日期：</label>
+    <input type="date" id="trade-date" name="trade-date">
+  </div>
+
+  <table id="volumeTable" class="volume-table">
+    <tr>
+      <th>時間</th>
+      <th>交易量</th>
+      <th>價格變動</th>
+      <th>相對交易量 (%)</th>
+      <th>大額交易次數</th>
+      <th>未平倉合約變化</th>
+      <th>交易量/未平倉比</th>
+      <th>備註</th>
+    </tr>
+    <tr>
+      <td>9:00-10:00</td>
+      <td><input type="number" name="volume"></td>
+      <td><input type="number" name="priceChange"></td>
+      <td><input type="number" name="relativeVolume"></td>
+      <td><input type="number" name="largeTrades"></td>
+      <td><input type="number" name="openInterestChange"></td>
+      <td><input type="number" name="volumeToOpenInterest"></td>
+      <td><input type="text" name="notes"></td>
+    </tr>
+    <!-- Repeat for other time slots -->
+  </table>
+
+  <div class="button-group">
+    <button onclick="exportToExcel()">導出到Excel</button>
+    <button onclick="importFromExcel()">導入Excel</button>
+  </div>
+
+  <script>
+    const dateInput = document.getElementById('trade-date');
+    const table = document.getElementById('volumeTable');
+
+    // 載入頁面時恢復數據
+    window.onload = function() {
+      const savedDate = localStorage.getItem('lastDate');
+      if (savedDate) {
+        dateInput.value = savedDate;
+        loadData(savedDate);
+      }
+    };
+
+    // 當日期改變時保存數據並載入新日期的數據
+    dateInput.addEventListener('change', function() {
+      saveData();
+      loadData(this.value);
+    });
+
+    // 自動保存數據
+    table.addEventListener('input', function() {
+      saveData();
+    });
+
+    function saveData() {
+      const date = dateInput.value;
+      const data = {};
+      const rows = table.querySelectorAll('tr:not(:first-child)');
+      rows.forEach((row, index) => {
+        const inputs = row.querySelectorAll('input');
+        data[index] = Array.from(inputs).map(input => input.value);
+      });
+      localStorage.setItem(date, JSON.stringify(data));
+      localStorage.setItem('lastDate', date);
+    }
+
+    function loadData(date) {
+      const savedData = localStorage.getItem(date);
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        const rows = table.querySelectorAll('tr:not(:first-child)');
+        rows.forEach((row, index) => {
+          const inputs = row.querySelectorAll('input');
+          inputs.forEach((input, i) => {
+            input.value = data[index][i] || '';
+          });
+        });
+      } else {
+        clearTable();
+      }
+    }
+
+    function clearTable() {
+      const inputs = table.querySelectorAll('input');
+      inputs.forEach(input => input.value = '');
+    }
+
+    function exportToExcel() {
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.table_to_sheet(table);
+      XLSX.utils.book_append_sheet(wb, ws, "交易量數據");
+      XLSX.writeFile(wb, `期貨交易量數據_${dateInput.value}.xlsx`);
+    }
+
+    function importFromExcel() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.xlsx, .xls';
+      input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = event => {
+          const data = new Uint8Array(event.target.result);
+          const workbook = XLSX.read(data, {type: 'array'});
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+          populateTable(jsonData);
+        };
+        reader.readAsArrayBuffer(file);
+      };
+      input.click();
+    }
+
+    function populateTable(data) {
+      const rows = table.querySelectorAll('tr:not(:first-child)');
+      rows.forEach((row, rowIndex) => {
+        const inputs = row.querySelectorAll('input');
+        inputs.forEach((input, colIndex) => {
+          input.value = data[rowIndex + 1][colIndex + 1] || '';
+        });
+      });
+      saveData();
+    }
+  </script>
+</body>
+</html>
